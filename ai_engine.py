@@ -53,7 +53,8 @@ Rules:
 - Questions must be open-ended, requiring 400-600 word essays.
 - Include the exact Bloom's verb in parentheses at the end of each question.
 - Number them clearly.
-- Return ONLY a JSON array: [{{"id":1, "question":"...", "difficulty":"{difficulty}", "bloom_level":"Analyze", "source_sections":"pages/sections referenced"}}]
+- For each question, provide a model_answer: a comprehensive 400-600 word ideal response that demonstrates the depth, accuracy, and structure expected for full marks. The model answer should reference specific content from the source material.
+- Return ONLY a JSON array: [{{"id":1, "question":"...", "difficulty":"{difficulty}", "bloom_level":"Analyze", "source_sections":"pages/sections referenced", "model_answer":"A comprehensive ideal response..."}}]
 
 Bloom's level mapping:
 - Basic: Remember, Understand (verbs: explain, summarize, define, describe, identify)
@@ -63,7 +64,7 @@ Bloom's level mapping:
     c = _get_client()
     response = c.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=4096,
+        max_tokens=16384,
         temperature=0.2,
         top_p=0.95,
         messages=[{"role": "user", "content": prompt}],
@@ -80,33 +81,51 @@ Bloom's level mapping:
     return questions
 
 
-def grade_response(question_text, response_text, source_content):
+def grade_response(question_text, response_text, source_content, max_points=10.0,
+                    model_answer=""):
     """
-    Grade a student's essay response using a 10-point rubric.
+    Grade a student's essay response using a rubric scaled to max_points.
 
+    If a model_answer is provided, it is used as the benchmark for grading.
     Returns a dict with: score, rubric_scores, detailed_feedback,
     strengths, improvements, overall_grade, excerpts_from_source.
     """
     max_source_len = 60000
     source_to_use = source_content[:max_source_len]
 
-    prompt = f"""You are an expert, fair, and consistent essay grader using the following rubric (10-point scale):
+    # Scale rubric dimensions proportionally
+    accuracy_max = round(max_points * 0.3, 1)
+    depth_max = round(max_points * 0.3, 1)
+    org_max = round(max_points * 0.2, 1)
+    clarity_max = round(max_points - accuracy_max - depth_max - org_max, 1)
 
-Content Accuracy & Fidelity to Source (0-3)
-Depth & Analysis (Bloom's level) (0-3)
-Organization & Structure (0-2)
-Clarity, Grammar & Style (0-2)
+    model_answer_section = ""
+    if model_answer.strip():
+        model_answer_section = f"""
+Model Answer (use as the benchmark for a perfect response — compare the student's essay against this):
+{model_answer.strip()}
+
+"""
+
+    prompt = f"""You are an expert, fair, and consistent essay grader using the following rubric ({max_points}-point scale):
+
+Content Accuracy & Fidelity to Source (0-{accuracy_max})
+Depth & Analysis (Bloom's level) (0-{depth_max})
+Organization & Structure (0-{org_max})
+Clarity, Grammar & Style (0-{clarity_max})
 
 Original Question: {question_text}
-
+{model_answer_section}
 Student Essay: {response_text}
 
 Source Content: {source_to_use}
 
+{"Compare the student's response against the model answer above. " if model_answer.strip() else ""}Grade based on how well the student addresses the question using evidence from the source content.
+
 Return ONLY valid JSON:
 {{
-  "score": 8.5,
-  "rubric_scores": {{"accuracy": 3, "depth": 2.5, "organization": 1.5, "clarity": 1.5}},
+  "score": {max_points * 0.85},
+  "rubric_scores": {{"accuracy": {accuracy_max}, "depth": {depth_max * 0.8}, "organization": {org_max * 0.75}, "clarity": {clarity_max * 0.75}}},
   "detailed_feedback": "Excellent synthesis of...",
   "strengths": ["..."],
   "improvements": ["..."],

@@ -28,9 +28,200 @@ from database import (
     get_exam_by_id, get_exam_questions, publish_exam, save_student_response,
     submit_student_exam, get_student_responses, get_all_submissions,
     save_grade, get_grade_for_response, get_grades_for_exam,
+    register_student, get_registrations_for_exam, is_student_registered,
+    get_draft_responses, has_student_submitted, approve_grade, adjust_grade,
+    bulk_approve_grades, get_grading_summary, update_model_answer,
 )
 from content_processor import process_file
 from ai_engine import generate_questions, grade_response
+
+# ── Context-Sensitive Help ─────────────────────────────────────────────────
+
+HELP_TEXT = {
+    "login": {
+        "title": "Getting Started",
+        "content": """
+**Teacher Login:** Enter the teacher password and click "Login as Teacher."
+
+**Student Registration:** Go to the "Register for Exam" tab. Enter your name, student ID, and the exam access code provided by your teacher. You must register before the exam goes live.
+
+**Taking an Exam:** After registering, switch to the "Take Exam" tab. Enter your name and exam access code. The exam must be published (live) by your teacher before you can enter.
+""",
+    },
+    "Content Library": {
+        "title": "Content Library Help",
+        "content": """
+**Uploading Content:**
+1. Click "Upload New Content" to expand the upload area.
+2. Drag & drop or select files (supported: PDF, DOCX, Markdown, TXT).
+3. Add optional comma-separated tags for organization.
+4. Click "Process & Upload" to convert and store your content.
+
+**Managing Content:**
+- Click "Preview" to see the cleaned markdown version.
+- Click "Delete" to remove content (linked questions will be deactivated).
+
+**Tips:**
+- Content is automatically converted to markdown for AI processing.
+- Larger files are truncated to ~80,000 characters for question generation.
+- Use descriptive tags to find content later when generating questions.
+""",
+    },
+    "Generate Questions": {
+        "title": "Question Generator Help",
+        "content": """
+**Generating Questions:**
+1. Select one or more content sources from the dropdown.
+2. Choose a difficulty level (Basic, Intermediate, Advanced, or All Levels).
+3. Set the number of questions (3–15).
+4. Optionally add custom instructions (e.g., "Focus on Chapter 3").
+5. Click "Generate Questions" — the AI will create essay questions using Bloom's Taxonomy.
+
+**Difficulty Levels:**
+- **Basic:** Remember & Understand (explain, summarize, define)
+- **Intermediate:** Apply & Analyze (compare, contrast, examine)
+- **Advanced:** Evaluate & Create (argue, critique, synthesize)
+- **All Levels:** Generates a mix across all three levels.
+
+**Answer Keys:** Each question is generated with a model answer (answer key) that serves as the benchmark for grading. You can review and edit answer keys in the Question Bank.
+
+**Note:** Requires an Anthropic API key configured in your .env file.
+""",
+    },
+    "Question Bank": {
+        "title": "Question Bank Help",
+        "content": """
+**Viewing Questions:**
+- All generated questions appear here, sorted by creation date.
+- Each question shows its difficulty level, Bloom's Taxonomy level, and source content.
+- Questions with an answer key show an `Answer Key` badge.
+
+**Answer Keys:**
+- Expand "Answer Key" on any question to view or edit the model answer.
+- The AI generates answer keys automatically during question generation.
+- **Edit answer keys** before publishing an exam to ensure grading accuracy.
+- Answer keys are used as the benchmark during auto-grading.
+
+**Filtering:**
+- Use the "Difficulty" dropdown to filter by level.
+- Type a Bloom level keyword (e.g., "Analyze") to filter by taxonomy.
+
+**Tips:**
+- Review and refine answer keys before building an exam — this directly improves grading quality.
+- Questions linked to deleted content are automatically deactivated and hidden.
+""",
+    },
+    "Exam Builder": {
+        "title": "Exam Builder Help",
+        "content": """
+**Creating an Exam:**
+1. Enter an exam title and student instructions.
+2. Set a time limit (0 = unlimited) and points per question.
+3. Choose whether to show all questions at once or one at a time.
+4. Select questions from the dropdown (sourced from your Question Bank).
+5. Use "Preview Exam" to see how it will look to students.
+6. Click "Create Exam" — an access code will be generated automatically.
+
+**After Creating:**
+- Share the access code with students so they can register.
+- Go to "Manage Exams" to publish the exam when ready.
+
+**Tips:**
+- The access code is a random 6-character alphanumeric string.
+- Students must register with this code before the exam is published.
+""",
+    },
+    "Manage Exams": {
+        "title": "Manage Exams Help",
+        "content": """
+**Exam Status:**
+- **Draft:** Created but not visible to students. Students can register.
+- **Live:** Published and available for registered students to take.
+
+**Publishing:**
+- Click "Publish" to make a draft exam live. This cannot be undone.
+- Ensure students have registered before publishing.
+
+**Monitoring:**
+- View registered student count and who has submitted.
+- Expand "Registered Students" to see individual registration details.
+""",
+    },
+    "Gradebook & Analytics": {
+        "title": "Gradebook Help",
+        "content": """
+**Grading Workflow:**
+1. Select an exam from the dropdown.
+2. View the summary bar (Total / Graded / Ungraded / Approved).
+3. Click "Auto-Grade Ungraded Responses" to have the AI grade all pending essays.
+4. Optionally click "Approve All AI Grades" to accept all scores as-is.
+
+**Results Table:**
+- Shows AI Score, Final Score (teacher-adjusted if applicable), grade letter, and approval status.
+- Export the full table as CSV.
+
+**Analytics:**
+- Average, highest, and lowest scores.
+- Breakdowns by difficulty level and Bloom's Taxonomy level.
+
+**Next Step:** Go to "Review Grades" to review individual responses, adjust scores, and add comments.
+""",
+    },
+    "Review Grades": {
+        "title": "Grade Review Help",
+        "content": """
+**Reviewing Grades:**
+1. Select an exam and use the filter (All / Pending Review / Approved).
+2. Expand each student response to see the AI's grading.
+3. Review the rubric breakdown, feedback, strengths, and improvement areas.
+
+**Adjusting Grades:**
+- Change the "Adjusted Score" to override the AI score.
+- Modify individual rubric dimension scores if needed.
+- Add teacher comments for the student or your own records.
+
+**Approving:**
+- **Approve As-Is:** Accept the AI grade without changes.
+- **Save Adjustments & Approve:** Save your score changes and approve.
+- **Bulk Approve:** Use the button at the top to approve all unapproved grades at once.
+
+**Exporting:**
+- Once grades are approved, use "Export Approved Grades (CSV)" to download.
+""",
+    },
+    "student_exam": {
+        "title": "Exam Help",
+        "content": """
+**Taking Your Exam:**
+- Read each question carefully before writing.
+- Aim for 400–600 words per response (word count is shown below each text area).
+- Click "Save Response" frequently to avoid losing your work.
+
+**Navigation (one-at-a-time mode):**
+- Use "Previous" and "Next" to move between questions.
+- Your response is saved automatically when navigating.
+
+**Timer:**
+- If the exam is timed, the remaining time is shown in the sidebar.
+- Refresh the page to update the timer display.
+- Your exam will be auto-submitted when time runs out.
+
+**Submitting:**
+- Click "Submit Exam" when you are finished. This is final — you cannot make changes after submitting.
+""",
+    },
+}
+
+
+def show_help(page_key):
+    """Display context-sensitive help in the sidebar for the current page."""
+    help_data = HELP_TEXT.get(page_key)
+    if not help_data:
+        return
+    with st.sidebar.expander("Help", expanded=False):
+        st.markdown(f"### {help_data['title']}")
+        st.markdown(help_data["content"])
+
 
 # ── App Config ──────────────────────────────────────────────────────────────
 
@@ -63,6 +254,7 @@ for k, v in defaults.items():
 
 def login_page():
     """Landing page with role selection and authentication."""
+    show_help("login")
     st.title("Essay Exam Generator & Grader")
     st.markdown("---")
 
@@ -82,29 +274,56 @@ def login_page():
 
     with col2:
         st.subheader("Student Exam Portal")
-        sname = st.text_input("Your Name", key="s_name")
-        sid = st.text_input("Student ID (optional)", key="s_id")
-        scode = st.text_input("Exam Access Code", key="s_code")
-        if st.button("Enter Exam", use_container_width=True):
-            if not sname.strip():
-                st.error("Please enter your name.")
-            elif not scode.strip():
-                st.error("Please enter the exam access code.")
-            else:
-                exam = get_exam_by_code(scode.strip())
-                if exam and exam.is_live:
-                    st.session_state.authenticated = True
-                    st.session_state.role = "student"
-                    st.session_state.student_name = sname.strip()
-                    st.session_state.student_id = sid.strip()
-                    st.session_state.exam_code = scode.strip()
-                    st.session_state.current_exam_id = exam.id
-                    st.session_state.exam_start_time = datetime.utcnow().isoformat()
-                    st.rerun()
-                elif exam and not exam.is_live:
-                    st.error("This exam is not yet live. Please contact your teacher.")
+        tab_register, tab_take = st.tabs(["Register for Exam", "Take Exam"])
+
+        with tab_register:
+            reg_name = st.text_input("Your Name", key="reg_name")
+            reg_id = st.text_input("Student ID", key="reg_id")
+            reg_email = st.text_input("Email (optional)", key="reg_email")
+            reg_code = st.text_input("Exam Access Code", key="reg_code")
+            if st.button("Register", use_container_width=True):
+                if not reg_name.strip():
+                    st.error("Please enter your name.")
+                elif not reg_code.strip():
+                    st.error("Please enter the exam access code.")
                 else:
-                    st.error("Invalid access code.")
+                    exam = get_exam_by_code(reg_code.strip())
+                    if not exam:
+                        st.error("Invalid access code.")
+                    elif not exam.allow_registration:
+                        st.error("Registration is closed for this exam.")
+                    else:
+                        register_student(exam.id, reg_name.strip(), reg_id.strip(), reg_email.strip())
+                        st.success(f"Registered for **{exam.title}**! Come back to the 'Take Exam' tab when your teacher makes the exam live.")
+
+        with tab_take:
+            sname = st.text_input("Your Name", key="s_name")
+            sid = st.text_input("Student ID (optional)", key="s_id")
+            scode = st.text_input("Exam Access Code", key="s_code")
+            if st.button("Enter Exam", use_container_width=True):
+                if not sname.strip():
+                    st.error("Please enter your name.")
+                elif not scode.strip():
+                    st.error("Please enter the exam access code.")
+                else:
+                    exam = get_exam_by_code(scode.strip())
+                    if not exam:
+                        st.error("Invalid access code.")
+                    elif not exam.is_live:
+                        st.error("This exam is not yet live. Please contact your teacher.")
+                    elif has_student_submitted(exam.id, sname.strip()):
+                        st.error("You have already submitted this exam.")
+                    elif not is_student_registered(exam.id, sname.strip()):
+                        st.error("You are not registered for this exam. Please register first.")
+                    else:
+                        st.session_state.authenticated = True
+                        st.session_state.role = "student"
+                        st.session_state.student_name = sname.strip()
+                        st.session_state.student_id = sid.strip()
+                        st.session_state.exam_code = scode.strip()
+                        st.session_state.current_exam_id = exam.id
+                        st.session_state.exam_start_time = datetime.utcnow().isoformat()
+                        st.rerun()
 
 
 # ── Teacher Pages ───────────────────────────────────────────────────────────
@@ -221,13 +440,16 @@ def question_generator_page():
 
         if all_questions:
             add_questions(all_questions)
-            st.success(f"Generated {len(all_questions)} questions!")
+            st.success(f"Generated {len(all_questions)} questions with answer keys!")
             for q in all_questions:
                 with st.container():
                     st.markdown(f"**Q{q['id']}** [{q['difficulty']} / {q['bloom_level']}]")
                     st.write(q["question"])
                     if q.get("source_sections"):
                         st.caption(f"Source: {q['source_sections']}")
+                    if q.get("model_answer"):
+                        with st.expander("View Answer Key"):
+                            st.write(q["model_answer"])
                     st.markdown("---")
 
 
@@ -260,7 +482,9 @@ def question_bank_page():
         with st.container():
             cols = st.columns([5, 1, 1])
             with cols[0]:
-                st.markdown(f"**Q#{q.id}** — `{q.difficulty}` / `{q.bloom_level}`")
+                has_key = bool(q.model_answer and q.model_answer.strip())
+                key_badge = " `Answer Key`" if has_key else ""
+                st.markdown(f"**Q#{q.id}** — `{q.difficulty}` / `{q.bloom_level}`{key_badge}")
                 st.write(q.question_text)
                 if q.source_sections:
                     st.caption(f"Source: {q.source_sections}")
@@ -270,6 +494,21 @@ def question_bank_page():
                     st.caption(f"From: {content.filename}")
             with cols[2]:
                 st.caption(f"Created: {q.created_at.strftime('%m/%d') if q.created_at else ''}")
+
+            # Answer key view/edit
+            with st.expander(f"Answer Key — Q#{q.id}"):
+                edited_answer = st.text_area(
+                    "Model Answer",
+                    value=q.model_answer or "",
+                    height=250,
+                    key=f"answer_key_{q.id}",
+                    help="Edit the AI-generated answer key. This is used as the benchmark during grading.",
+                )
+                if st.button("Save Answer Key", key=f"save_key_{q.id}"):
+                    update_model_answer(q.id, edited_answer)
+                    st.success("Answer key saved!")
+                    st.rerun()
+
             st.markdown("---")
 
 
@@ -364,11 +603,21 @@ def manage_exams_page():
                 else:
                     st.success("Live")
 
-            # Show submissions count
+            # Registrations
+            regs = get_registrations_for_exam(exam.id)
             subs = get_student_responses(exam.id)
-            students = set(s.student_name for s in subs)
-            if students:
-                st.caption(f"Submissions from: {', '.join(students)}")
+            students_submitted = set(s.student_name for s in subs)
+
+            st.caption(f"Registered: {len(regs)} | Submitted: {len(students_submitted)}")
+
+            with st.expander(f"Registered Students ({len(regs)})"):
+                if regs:
+                    for reg in regs:
+                        submitted = "Submitted" if reg.student_name in students_submitted else "Not submitted"
+                        st.write(f"- **{reg.student_name}** {f'({reg.student_id_str})' if reg.student_id_str else ''} "
+                                 f"— {reg.student_email or 'No email'} — _{submitted}_")
+                else:
+                    st.info("No students registered yet.")
 
             st.markdown("---")
 
@@ -399,28 +648,44 @@ def gradebook_page():
         st.info("No submissions yet for this exam.")
         return
 
-    # Group by student
-    students = {}
-    for r in responses:
-        if r.student_name not in students:
-            students[r.student_name] = []
-        students[r.student_name].append(r)
+    # Grading summary
+    summary = get_grading_summary(selected_exam_id)
+    col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+    with col_s1:
+        st.metric("Total Responses", summary["total_responses"])
+    with col_s2:
+        st.metric("Graded", summary["graded_count"])
+    with col_s3:
+        st.metric("Ungraded", summary["ungraded_count"])
+    with col_s4:
+        st.metric("Approved", summary["approved_count"])
+
+    st.markdown("---")
 
     # Grade button
     ungraded = [r for r in responses if get_grade_for_response(r.id) is None]
     if ungraded:
         st.warning(f"{len(ungraded)} responses need grading.")
-        if st.button("Grade All Ungraded Responses", type="primary"):
+
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        if ungraded and st.button("Auto-Grade Ungraded Responses", type="primary"):
+            eq_list = get_exam_questions(selected_exam_id)
             progress = st.progress(0)
             for i, resp in enumerate(ungraded):
                 with st.spinner(f"Grading response {i+1}/{len(ungraded)}..."):
                     try:
-                        q = next((eq["question"] for eq in get_exam_questions(selected_exam_id)
+                        q = next((eq["question"] for eq in eq_list
                                   if eq["question"].id == resp.question_id), None)
                         if q:
+                            eq = next((eq["eq"] for eq in eq_list
+                                       if eq["question"].id == resp.question_id), None)
+                            pts = eq.points if eq else 10.0
                             source_content = get_content_by_id(q.content_id)
                             source_md = source_content.cleaned_markdown if source_content else ""
-                            result = grade_response(q.question_text, resp.response_text, source_md)
+                            answer_key = q.model_answer if q.model_answer else ""
+                            result = grade_response(q.question_text, resp.response_text, source_md,
+                                                    max_points=pts, model_answer=answer_key)
                             save_grade(
                                 response_id=resp.id,
                                 score_json=result.get("rubric_scores", {}),
@@ -435,6 +700,12 @@ def gradebook_page():
                 progress.progress((i + 1) / len(ungraded))
             st.success("All responses graded!")
             st.rerun()
+    with col_g2:
+        if summary["graded_count"] > summary["approved_count"]:
+            if st.button("Approve All AI Grades"):
+                count = bulk_approve_grades(selected_exam_id)
+                st.success(f"Approved {count} grades!")
+                st.rerun()
 
     # Display grades table
     st.subheader("Results")
@@ -444,13 +715,21 @@ def gradebook_page():
         rows = []
         for g in grade_data:
             grade = g["grade"]
+            if grade:
+                final = grade.teacher_adjusted_score if grade.teacher_adjusted_score is not None else grade.total_score
+                status = "Approved" if grade.is_approved else "Pending Review"
+            else:
+                final = "Ungraded"
+                status = "—"
             rows.append({
                 "Student": g["student_name"],
                 "Question": g["question"][:60] + "..." if len(g["question"]) > 60 else g["question"],
                 "Difficulty": g["difficulty"],
                 "Bloom Level": g["bloom_level"],
-                "Score": grade.total_score if grade else "Ungraded",
+                "AI Score": grade.total_score if grade else "—",
+                "Final Score": final,
                 "Grade": grade.overall_grade if grade else "—",
+                "Status": status,
                 "Submitted": g["submitted_at"].strftime("%Y-%m-%d %H:%M") if g["submitted_at"] else "",
             })
 
@@ -463,16 +742,16 @@ def gradebook_page():
 
         # Analytics
         st.subheader("Analytics")
-        graded_rows = [r for r in rows if isinstance(r["Score"], (int, float))]
+        graded_rows = [r for r in rows if isinstance(r["Final Score"], (int, float))]
         if graded_rows:
-            scores = [r["Score"] for r in graded_rows]
+            scores = [r["Final Score"] for r in graded_rows]
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Average Score", f"{sum(scores)/len(scores):.1f}/10")
+                st.metric("Average Score", f"{sum(scores)/len(scores):.1f}")
             with col2:
-                st.metric("Highest", f"{max(scores):.1f}/10")
+                st.metric("Highest", f"{max(scores):.1f}")
             with col3:
-                st.metric("Lowest", f"{min(scores):.1f}/10")
+                st.metric("Lowest", f"{min(scores):.1f}")
 
             # By difficulty
             st.markdown("**Average by Difficulty:**")
@@ -481,9 +760,9 @@ def gradebook_page():
                 d = r["Difficulty"]
                 if d not in diff_scores:
                     diff_scores[d] = []
-                diff_scores[d].append(r["Score"])
+                diff_scores[d].append(r["Final Score"])
             for d, s in diff_scores.items():
-                st.write(f"- {d}: {sum(s)/len(s):.1f}/10 ({len(s)} responses)")
+                st.write(f"- {d}: {sum(s)/len(s):.1f} ({len(s)} responses)")
 
             # By Bloom level
             st.markdown("**Average by Bloom Level:**")
@@ -492,9 +771,9 @@ def gradebook_page():
                 b = r["Bloom Level"]
                 if b not in bloom_scores:
                     bloom_scores[b] = []
-                bloom_scores[b].append(r["Score"])
+                bloom_scores[b].append(r["Final Score"])
             for b, s in bloom_scores.items():
-                st.write(f"- {b}: {sum(s)/len(s):.1f}/10 ({len(s)} responses)")
+                st.write(f"- {b}: {sum(s)/len(s):.1f} ({len(s)} responses)")
 
         # Detailed feedback view
         st.subheader("Detailed Feedback")
@@ -522,6 +801,200 @@ def gradebook_page():
                 st.text(g["response"])
 
 
+# ── Teacher Review Page ────────────────────────────────────────────────────
+
+def review_grades_page():
+    """Teacher interface to review AI grades, adjust scores, and approve."""
+    st.header("Review Grades")
+
+    exams = get_all_exams()
+    if not exams:
+        st.info("No exams yet.")
+        return
+
+    exam_options = {e.id: e.title for e in exams}
+    selected_exam_id = st.selectbox(
+        "Select Exam",
+        options=list(exam_options.keys()),
+        format_func=lambda x: exam_options[x],
+        key="review_exam_select",
+    )
+    if not selected_exam_id:
+        return
+
+    summary = get_grading_summary(selected_exam_id)
+    if summary["total_responses"] == 0:
+        st.info("No submissions yet.")
+        return
+
+    # Summary bar
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Graded", f"{summary['graded_count']}/{summary['total_responses']}")
+    with col2:
+        st.metric("Approved", f"{summary['approved_count']}/{summary['graded_count']}")
+    with col3:
+        if summary["graded_count"] > 0:
+            st.metric("Avg Score", f"{summary['average_score']:.1f}")
+
+    if summary["ungraded_count"] > 0:
+        st.warning(f"{summary['ungraded_count']} responses still need grading. Go to Gradebook to auto-grade first.")
+
+    # Bulk approve
+    unapproved = summary["graded_count"] - summary["approved_count"]
+    if unapproved > 0:
+        if st.button(f"Approve All {unapproved} AI Grades Without Changes", type="secondary"):
+            count = bulk_approve_grades(selected_exam_id)
+            st.success(f"Approved {count} grades!")
+            st.rerun()
+
+    st.markdown("---")
+
+    # Filter
+    filter_opt = st.radio("Show", ["All", "Pending Review", "Approved"], horizontal=True, key="review_filter")
+
+    grade_data = get_grades_for_exam(selected_exam_id)
+
+    # Apply filter
+    if filter_opt == "Pending Review":
+        grade_data = [g for g in grade_data if g["grade"] and not g["grade"].is_approved]
+    elif filter_opt == "Approved":
+        grade_data = [g for g in grade_data if g["grade"] and g["grade"].is_approved]
+
+    if not grade_data:
+        st.info("No matching responses.")
+        return
+
+    # Group by student
+    students_data = {}
+    for g in grade_data:
+        name = g["student_name"]
+        if name not in students_data:
+            students_data[name] = []
+        students_data[name].append(g)
+
+    for student_name, responses in students_data.items():
+        st.subheader(f"Student: {student_name}")
+
+        for g in responses:
+            grade = g["grade"]
+            if not grade:
+                st.caption(f"Q: {g['question'][:60]}... — *Not yet graded*")
+                continue
+
+            status_icon = "checkmark" if grade.is_approved else "hourglass"
+            label = f"{'[Approved] ' if grade.is_approved else '[Pending] '}{g['question'][:60]}... — AI: {grade.overall_grade}"
+
+            with st.expander(label):
+                # Question
+                st.markdown(f"**Question** _{g['difficulty']} / {g['bloom_level']}_")
+                st.write(g["question"])
+
+                # Student response
+                st.markdown("**Student Response:**")
+                st.text_area("", value=g["response"], height=200,
+                             disabled=True, key=f"rev_resp_{g['response_id']}")
+
+                st.markdown("---")
+
+                # AI Grading Results
+                st.markdown("**AI Grading Results:**")
+                ai_col1, ai_col2 = st.columns(2)
+                with ai_col1:
+                    st.markdown(f"**Score:** {grade.total_score} ({grade.overall_grade})")
+                    if grade.score_json:
+                        st.markdown("**Rubric Breakdown:**")
+                        for dim, score in grade.score_json.items():
+                            st.write(f"- {dim.replace('_', ' ').title()}: {score}")
+                with ai_col2:
+                    st.markdown(f"**Feedback:** {grade.feedback_text}")
+                    if grade.strengths:
+                        st.markdown("**Strengths:**")
+                        for s in grade.strengths:
+                            st.write(f"- {s}")
+                    if grade.improvements:
+                        st.markdown("**Areas for Improvement:**")
+                        for imp in grade.improvements:
+                            st.write(f"- {imp}")
+
+                st.markdown("---")
+
+                # Teacher adjustment section
+                st.markdown("**Teacher Review:**")
+                current_adjusted = grade.teacher_adjusted_score if grade.teacher_adjusted_score is not None else grade.total_score
+
+                adj_score = st.number_input(
+                    "Adjusted Score",
+                    min_value=0.0,
+                    value=float(current_adjusted),
+                    step=0.5,
+                    key=f"adj_score_{grade.id}",
+                )
+
+                # Editable rubric
+                if grade.score_json:
+                    st.markdown("**Adjust Rubric Scores:**")
+                    adjusted_rubric = grade.teacher_adjusted_rubric or grade.score_json
+                    rubric_cols = st.columns(len(grade.score_json))
+                    new_rubric = {}
+                    for i, (dim, original_val) in enumerate(grade.score_json.items()):
+                        with rubric_cols[i]:
+                            adj_val = adjusted_rubric.get(dim, original_val) if isinstance(adjusted_rubric, dict) else original_val
+                            new_rubric[dim] = st.number_input(
+                                dim.replace("_", " ").title(),
+                                min_value=0.0,
+                                value=float(adj_val),
+                                step=0.5,
+                                key=f"adj_rubric_{grade.id}_{dim}",
+                            )
+
+                teacher_notes = st.text_area(
+                    "Teacher Comments",
+                    value=grade.teacher_comments or "",
+                    key=f"teacher_notes_{grade.id}",
+                    placeholder="Add your notes here...",
+                )
+
+                # Action buttons
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    if st.button("Approve As-Is", key=f"approve_{grade.id}"):
+                        approve_grade(grade.id, teacher_notes)
+                        st.success("Approved!")
+                        st.rerun()
+                with btn_col2:
+                    if st.button("Save Adjustments & Approve", key=f"adjust_{grade.id}", type="primary"):
+                        rubric_to_save = new_rubric if grade.score_json else None
+                        adjust_grade(grade.id, adj_score, rubric_to_save, teacher_notes)
+                        st.success(f"Score adjusted to {adj_score} and approved!")
+                        st.rerun()
+
+        st.markdown("---")
+
+    # Export approved grades
+    approved_data = [g for g in get_grades_for_exam(selected_exam_id) if g["grade"] and g["grade"].is_approved]
+    if approved_data:
+        st.subheader("Export")
+        export_rows = []
+        for g in approved_data:
+            grade = g["grade"]
+            final = grade.teacher_adjusted_score if grade.teacher_adjusted_score is not None else grade.total_score
+            export_rows.append({
+                "Student": g["student_name"],
+                "Student ID": g["student_id"],
+                "Question": g["question"][:80],
+                "AI Score": grade.total_score,
+                "Final Score": final,
+                "Grade": grade.overall_grade,
+                "Teacher Comments": grade.teacher_comments or "",
+            })
+        export_df = pd.DataFrame(export_rows)
+        csv = export_df.to_csv(index=False)
+        exam = get_exam_by_id(selected_exam_id)
+        st.download_button("Export Approved Grades (CSV)", csv,
+                           f"approved_grades_{exam.title}.csv", "text/csv")
+
+
 # ── Student Exam Page ───────────────────────────────────────────────────────
 
 def student_exam_page():
@@ -532,6 +1005,22 @@ def student_exam_page():
     if not exam:
         st.error("Exam not found.")
         return
+
+    # Prevent re-entry after submission
+    if has_student_submitted(exam_id, st.session_state.student_name):
+        st.success("You have already submitted this exam. Thank you!")
+        if st.button("Logout"):
+            for k in defaults:
+                st.session_state[k] = defaults[k]
+            st.rerun()
+        return
+
+    # Pre-load saved draft responses
+    drafts = get_draft_responses(exam_id, st.session_state.student_name)
+    for draft in drafts:
+        key = f"resp_{exam_id}_{draft.question_id}"
+        if key not in st.session_state:
+            st.session_state[key] = draft.response_text
 
     st.title(exam.title)
     st.markdown(exam.instructions)
@@ -649,6 +1138,7 @@ def main():
     if st.session_state.role == "student":
         # Minimal sidebar for students
         st.sidebar.markdown(f"**Student:** {st.session_state.student_name}")
+        show_help("student_exam")
         if st.sidebar.button("Logout"):
             for k in defaults:
                 st.session_state[k] = defaults[k]
@@ -666,8 +1156,10 @@ def main():
     page = st.sidebar.radio(
         "Navigation",
         ["Content Library", "Generate Questions", "Question Bank",
-         "Exam Builder", "Manage Exams", "Gradebook & Analytics"],
+         "Exam Builder", "Manage Exams", "Gradebook & Analytics", "Review Grades"],
     )
+
+    show_help(page)
 
     if page == "Content Library":
         content_library_page()
@@ -681,6 +1173,8 @@ def main():
         manage_exams_page()
     elif page == "Gradebook & Analytics":
         gradebook_page()
+    elif page == "Review Grades":
+        review_grades_page()
 
 
 if __name__ == "__main__":

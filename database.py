@@ -47,6 +47,7 @@ class Question(Base):
     difficulty = Column(String(20), nullable=False)  # Basic, Intermediate, Advanced
     bloom_level = Column(String(30), nullable=False)
     source_sections = Column(Text, default="")
+    model_answer = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
 
@@ -68,8 +69,11 @@ class Exam(Base):
     show_all_questions = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    allow_registration = Column(Boolean, default=True)
+
     exam_questions = relationship("ExamQuestion", back_populates="exam", order_by="ExamQuestion.order")
     student_responses = relationship("StudentResponse", back_populates="exam")
+    registrations = relationship("ExamRegistration", back_populates="exam")
 
 
 class ExamQuestion(Base):
@@ -118,14 +122,66 @@ class Grade(Base):
     overall_grade = Column(String(5), default="")
     graded_at = Column(DateTime, default=datetime.utcnow)
 
+    # Teacher review fields
+    teacher_adjusted_score = Column(Float, nullable=True)
+    teacher_adjusted_rubric = Column(JSON, nullable=True)
+    teacher_comments = Column(Text, default="")
+    is_approved = Column(Boolean, default=False)
+    approved_at = Column(DateTime, nullable=True)
+
     response = relationship("StudentResponse", back_populates="grade")
+
+    @property
+    def final_score(self):
+        """Return teacher-adjusted score if set, otherwise AI score."""
+        if self.teacher_adjusted_score is not None:
+            return self.teacher_adjusted_score
+        return self.total_score
+
+
+class ExamRegistration(Base):
+    """Student registration for an exam."""
+    __tablename__ = "exam_registrations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    exam_id = Column(Integer, ForeignKey("exams.id"), nullable=False)
+    student_name = Column(String(255), nullable=False)
+    student_id_str = Column(String(100), default="")
+    student_email = Column(String(255), default="")
+    registered_at = Column(DateTime, default=datetime.utcnow)
+
+    exam = relationship("Exam", back_populates="registrations")
 
 
 # ── Initialize DB ───────────────────────────────────────────────────────────
 
 def init_db():
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist, then migrate."""
     Base.metadata.create_all(engine)
+    _migrate_db()
+
+
+def _migrate_db():
+    """Add missing columns to existing tables (SQLite ALTER TABLE)."""
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+
+    migrations = [
+        ("grades", "teacher_adjusted_score", "FLOAT"),
+        ("grades", "teacher_adjusted_rubric", "JSON"),
+        ("grades", "teacher_comments", "TEXT DEFAULT ''"),
+        ("grades", "is_approved", "BOOLEAN DEFAULT 0"),
+        ("grades", "approved_at", "DATETIME"),
+        ("exams", "allow_registration", "BOOLEAN DEFAULT 1"),
+        ("questions", "model_answer", "TEXT DEFAULT ''"),
+    ]
+
+    for table, column, col_type in migrations:
+        if table in insp.get_table_names():
+            existing = [c["name"] for c in insp.get_columns(table)]
+            if column not in existing:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
 
 
 def get_session():
@@ -196,8 +252,21 @@ def add_questions(questions_data):
                 difficulty=q["difficulty"],
                 bloom_level=q["bloom_level"],
                 source_sections=q.get("source_sections", ""),
+                model_answer=q.get("model_answer", ""),
             )
             session.add(question)
+        session.commit()
+    finally:
+        session.close()
+
+
+def update_model_answer(question_id, model_answer):
+    """Update the model answer for a question."""
+    session = get_session()
+    try:
+        session.query(Question).filter(Question.id == question_id).update(
+            {"model_answer": model_answer}
+        )
         session.commit()
     finally:
         session.close()
@@ -410,9 +479,11 @@ def get_grades_for_exam(exam_id):
             grade = session.query(Grade).filter(Grade.response_id == r.id).first()
             q = session.query(Question).filter(Question.id == r.question_id).first()
             results.append({
+                "response_id": r.id,
                 "student_name": r.student_name,
                 "student_id": r.student_id_str,
                 "question": q.question_text if q else "",
+                "question_id": q.id if q else None,
                 "difficulty": q.difficulty if q else "",
                 "bloom_level": q.bloom_level if q else "",
                 "response": r.response_text,
@@ -420,5 +491,182 @@ def get_grades_for_exam(exam_id):
                 "grade": grade,
             })
         return results
+    finally:
+        session.close()
+
+
+# ── Registration CRUD ──────────────────────────────────────────────────────
+
+def register_student(exam_id, student_name, student_id_str="", student_email=""):
+    """Register a student for an exam. Returns registration or None if duplicate."""
+    session = get_session()
+    try:
+        existing = (
+            session.query(ExamRegistration)
+            .filter(
+                ExamRegistration.exam_id == exam_id,
+                ExamRegistration.student_name == student_name,
+            )
+            .first()
+        )
+        if existing:
+            return existing
+        reg = ExamRegistration(
+            exam_id=exam_id,
+            student_name=student_name,
+            student_id_str=student_id_str,
+            student_email=student_email,
+        )
+        session.add(reg)
+        session.commit()
+        session.refresh(reg)
+        return reg
+    finally:
+        session.close()
+
+
+def get_registrations_for_exam(exam_id):
+    session = get_session()
+    try:
+        return (
+            session.query(ExamRegistration)
+            .filter(ExamRegistration.exam_id == exam_id)
+            .order_by(ExamRegistration.registered_at.desc())
+            .all()
+        )
+    finally:
+        session.close()
+
+
+def is_student_registered(exam_id, student_name):
+    session = get_session()
+    try:
+        return (
+            session.query(ExamRegistration)
+            .filter(
+                ExamRegistration.exam_id == exam_id,
+                ExamRegistration.student_name == student_name,
+            )
+            .first()
+        ) is not None
+    finally:
+        session.close()
+
+
+def get_draft_responses(exam_id, student_name):
+    """Return saved but not yet submitted responses."""
+    session = get_session()
+    try:
+        return (
+            session.query(StudentResponse)
+            .filter(
+                StudentResponse.exam_id == exam_id,
+                StudentResponse.student_name == student_name,
+                StudentResponse.is_submitted == False,
+            )
+            .all()
+        )
+    finally:
+        session.close()
+
+
+def has_student_submitted(exam_id, student_name):
+    """Check if a student has already submitted this exam."""
+    session = get_session()
+    try:
+        return (
+            session.query(StudentResponse)
+            .filter(
+                StudentResponse.exam_id == exam_id,
+                StudentResponse.student_name == student_name,
+                StudentResponse.is_submitted == True,
+            )
+            .first()
+        ) is not None
+    finally:
+        session.close()
+
+
+# ── Teacher Review CRUD ────────────────────────────────────────────────────
+
+def approve_grade(grade_id, teacher_comments=""):
+    session = get_session()
+    try:
+        grade = session.query(Grade).filter(Grade.id == grade_id).first()
+        if grade:
+            grade.is_approved = True
+            grade.approved_at = datetime.utcnow()
+            if teacher_comments:
+                grade.teacher_comments = teacher_comments
+            session.commit()
+    finally:
+        session.close()
+
+
+def adjust_grade(grade_id, new_score, new_rubric=None, teacher_comments=""):
+    session = get_session()
+    try:
+        grade = session.query(Grade).filter(Grade.id == grade_id).first()
+        if grade:
+            grade.teacher_adjusted_score = new_score
+            if new_rubric:
+                grade.teacher_adjusted_rubric = new_rubric
+            grade.teacher_comments = teacher_comments
+            grade.is_approved = True
+            grade.approved_at = datetime.utcnow()
+            session.commit()
+    finally:
+        session.close()
+
+
+def bulk_approve_grades(exam_id):
+    """Approve all graded but unapproved grades for an exam."""
+    session = get_session()
+    try:
+        responses = (
+            session.query(StudentResponse)
+            .filter(StudentResponse.exam_id == exam_id, StudentResponse.is_submitted == True)
+            .all()
+        )
+        count = 0
+        for r in responses:
+            grade = session.query(Grade).filter(Grade.response_id == r.id).first()
+            if grade and not grade.is_approved:
+                grade.is_approved = True
+                grade.approved_at = datetime.utcnow()
+                count += 1
+        session.commit()
+        return count
+    finally:
+        session.close()
+
+
+def get_grading_summary(exam_id):
+    """Return grading stats for an exam."""
+    session = get_session()
+    try:
+        responses = (
+            session.query(StudentResponse)
+            .filter(StudentResponse.exam_id == exam_id, StudentResponse.is_submitted == True)
+            .all()
+        )
+        total = len(responses)
+        graded = 0
+        approved = 0
+        scores = []
+        for r in responses:
+            grade = session.query(Grade).filter(Grade.response_id == r.id).first()
+            if grade:
+                graded += 1
+                scores.append(grade.teacher_adjusted_score if grade.teacher_adjusted_score is not None else grade.total_score)
+                if grade.is_approved:
+                    approved += 1
+        return {
+            "total_responses": total,
+            "graded_count": graded,
+            "ungraded_count": total - graded,
+            "approved_count": approved,
+            "average_score": sum(scores) / len(scores) if scores else 0,
+        }
     finally:
         session.close()
