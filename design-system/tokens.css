@@ -1,0 +1,101 @@
+/* =============================================================================
+   The Institutes Knowledge Group — Design Tokens (CSS custom properties)
+   Source: TI Design System v2.1 (May 2026), §4 and §12.1
+   Mapped 1:1 from tokens.scss. SCSS is the source of truth; this is the
+   runtime/non-SCSS consumer. RULE: use these vars — never hardcoded hex.
+   ============================================================================= */
+
+:root {
+  /* ----- Brand ----- */
+  --brand-primary-blue: #003370;
+  --brand-primary-red: #980d22;
+  --brand-secondary-gray: #5c6f7c;
+  --brand-secondary-purple: #650360; /* AI / emerging-tech content ONLY */
+  --brand-text-gray: #58595b; /* all body text */
+
+  /* ----- Accent ----- */
+  --accent-blue-light: #72ccd2;
+  --accent-blue: #218198;
+  --accent-blue-dark: #042246;
+  --accent-orange: #c05810;
+  --accent-orange-dark: #a63b00; /* H5 labels; card category labels */
+  --accent-yellow: #faa634;
+  --accent-red: #801129;
+  --accent-green: #6c7d45; /* success; CEU Unlimited */
+  /* TODO: confirm canonical names against living style guide */
+  --accent-blue-alt: #19a1c9;
+  --accent-green-alt: #728549;
+  --accent-green-dark: #185d6e;
+  --accent-lavender: #e1ecf5;
+  --accent-blue-tint: #d0e6e9;
+
+  /* ----- Neutral ----- */
+  --neutral-xlight: #f2f2f2;
+  --neutral-light: #eaeaea;
+  --neutral: #cdcdcd;
+  --neutral-medium-dark: #6c6c6c; /* disabled text */
+  --neutral-dark: #232323;
+  --true-black: #000000;
+  --white: #ffffff;
+
+  /* ----- Alert / Semantic ----- */
+  --alert-red: #8b2025;
+  --alert-blue: #007db8;
+
+  /* ----- Gradients (use ONLY these) ----- */
+  --grad-orange: linear-gradient(90deg, #c05810 26%, #a63b00 100%);
+  --grad-blue: linear-gradient(270deg, #007db8 26%, #003370 100%);
+  --grad-blue-light: linear-gradient(270deg, #1aa1c9 -10%, #006385 100%);
+  --grad-red: linear-gradient(270deg, #870e28 26%, #570f21 100%);
+  --grad-purple: linear-gradient(270deg, #861e81 26%, #5d0158 100%); /* AI ONLY */
+
+  /* ----- Typography ----- */
+  --font-serif: Merriweather, Georgia, serif; /* H1, H3, H4 */
+  --font-sans: Montserrat, sans-serif; /* H2, H5, buttons, nav */
+  --font-body: "Open Sans", "Segoe UI", sans-serif; /* body */
+
+  /* type scale (base) */
+  --h1-size: 38px; --h1-lh: 1.58; --h1-mod: 40px;
+  --h2-size: 36px; --h2-lh: 1.5;  --h2-mod: 38px;
+  --h3-size: 30px; --h3-lh: 1.73; --h3-mod: 32px;
+  --h4-size: 25px; --h4-lh: 1.48; --h4-mod: 27px;
+  --h5-size: 12px; --h5-lh: 1.5;  --h5-mod: 14px;  /* UPPERCASE, ls 1px, color accent-orange-dark */
+  --body-size: 14px; --body-lh: 1.86; --body-mod: 16px;
+
+  /* ----- Spacing (8px multiples; 16px base) ----- */
+  --space-tight: 8px;
+  --base-vertical-margin: 16px;
+  --base-margin-bottom: 24px;
+  --space-block: 32px;
+  --space-section: 48px;
+  --space-rhythm: 64px;
+
+  /* ----- Elevation ----- */
+  --shadow-standard: 0 2px 24px 0 rgba(0,0,0,0.15);
+  --shadow-subtle: 0 2px 8px rgba(0,0,0,0.06);
+
+  /* ----- Radius ----- */
+  --radius-none: 0;     /* cards — intentional square corners */
+  --radius-sm: 4px;     /* buttons, inputs, badges, tooltip, modal */
+  --radius-md: 6px;     /* nav bar */
+  --radius-pill: 9999px;
+
+  /* ----- Motion ----- */
+  --motion-fast: 100ms;
+  --motion-normal: 200ms;
+  --motion-slow: 350ms;
+  --motion-deliberate: 500ms;
+
+  /* ----- Grid / breakpoints (reference; media queries use literals) ----- */
+  --content-max-width: 1280px;
+  --grid-gutter-desktop: 24px;
+  --grid-gutter-tablet: 16px;
+}
+
+/* Reduced motion — REQUIRED */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

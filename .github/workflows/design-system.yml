@@ -1,0 +1,35 @@
+name: Design System
+
+# Reports TI Design System lint findings on every PR.
+# REPORT MODE: this job does not fail the build yet — it surfaces hardcoded hex,
+# non-approved fonts, and outline:none so the baseline can be cleaned up first.
+# To make it a blocking gate once a repo is clean, change the run step to:
+#   node design-system/lint.mjs --strict --changed
+# and add this job to your branch protection required checks.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: design-system-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ds-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so --changed can diff against origin/main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: TI Design System lint (report mode)
+        run: node design-system/lint.mjs --changed

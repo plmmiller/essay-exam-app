@@ -1,0 +1,109 @@
+// =============================================================================
+// The Institutes Knowledge Group — Design Tokens (SCSS)
+// Source: TI Design System v2.1 (May 2026), §4 and §12.1
+// Authoritative web reference: web-develop.theinstitutes.org/themes/ti_west/public/style-guide/
+//
+// These values are transcribed verbatim from the confirmed style-guide block.
+// SCSS variables are the source; CSS custom properties (tokens.css) map to them.
+// RULE: component CSS references these variables — never hardcoded hex.
+// =============================================================================
+
+// ----- Brand -----------------------------------------------------------------
+$brand-primary-blue:     #003370; // Navigation, headers, primary CTAs, body links, section headings
+$brand-primary-red:      #980d22; // Secondary brand accent; alert/error states
+$brand-secondary-gray:   #5c6f7c; // Subheadings, secondary UI labels, inactive tab text
+$brand-secondary-purple: #650360; // AI / emerging-technology designation content ONLY
+$brand-text-gray:        #58595b; // All body text, paragraph copy, default text color
+
+// ----- Accent ----------------------------------------------------------------
+$accent-blue-light:  #72ccd2; // Background accents, teal decorative bands
+$accent-blue:        #218198; // Secondary interactive elements, info states
+$accent-blue-dark:   #042246; // Deep navy; gradient pair with Primary Blue
+$accent-orange:      #c05810; // CTAs, highlights; gradient pair start
+$accent-orange-dark: #a63b00; // H5 uppercase labels; gradient end; card category labels
+$accent-yellow:      #faa634; // Warning states; promotional badges
+$accent-red:         #801129; // Destructive actions; error UI
+$accent-green:       #6c7d45; // Success states; CEU Unlimited product identifier
+
+// Accent colors named in §4.1 tables but WITHOUT a confirmed SCSS variable name.
+// Carried as TODO — confirm canonical variable names against the living style guide.
+$accent-blue-alt:    #19a1c9 !default;  // TODO confirm name. (Gradient Blue Light uses #1aa1c9 — see note in tokens.md)
+$accent-green-alt:   #728549 !default;  // TODO confirm name. Success hover
+$accent-green-dark:  #185d6e !default;  // TODO confirm name. Success pressed / deep
+$accent-lavender:    #e1ecf5 !default;  // TODO confirm name. Card image placeholder; subtle tints
+$accent-blue-tint:   #d0e6e9 !default;  // TODO confirm name. Card image placeholder (Blue Light tint)
+
+// ----- Neutral ---------------------------------------------------------------
+$neutral-xlight:     #f2f2f2; // Alternating table rows; section backgrounds
+$neutral-light:      #eaeaea; // Borders, dividers, card outlines
+$neutral:            #cdcdcd; // Form input borders; accordion borders
+$neutral-medium-dark: #6c6c6c !default; // Disabled text (no confirmed var name — TODO)
+$neutral-dark:       #232323; // Tooltip backgrounds; near-black text
+$true-black:         #000000; // Use sparingly
+$white:              #ffffff; // Primary page + card background
+
+// ----- Alert / Semantic ------------------------------------------------------
+$alert-red:  #8b2025; // Error notifications and critical alerts
+$alert-blue: #007db8; // Informational notifications and banners
+// Warning = $accent-yellow (#faa634); Success = $accent-green (#6c7d45)
+
+// ----- Gradients (use ONLY these — no ad hoc gradients) -----------------------
+$grad-orange:     linear-gradient(90deg,  #c05810 26%, #a63b00 100%); // Primary CTA bg; Essentials brand
+$grad-blue:       linear-gradient(270deg, #007db8 26%, #003370 100%); // Hero bands; primary brand sections
+$grad-blue-light: linear-gradient(270deg, #1aa1c9 -10%, #006385 100%); // CEU + secondary feature sections
+$grad-red:        linear-gradient(270deg, #870e28 26%, #570f21 100%); // Alert / urgent promo bands
+$grad-purple:     linear-gradient(270deg, #861e81 26%, #5d0158 100%); // AI / emerging-tech designation sections ONLY
+
+// ----- Typography ------------------------------------------------------------
+// Three typefaces. Intentional. Do not simplify, substitute, or supplement.
+$font-serif: Merriweather, Georgia, serif;            // H1, H3, H4 — institutional voice
+$font-sans:  Montserrat, sans-serif;                  // H2, H5, buttons, nav, UI labels
+$font-body:  'Open Sans', 'Segoe UI', sans-serif;     // Body, paragraphs, forms, captions
+
+// Type scale — base size / modifier size / line-height
+// H1  Merriweather Light    38px / 40px (2.5rem)    / 1.58
+// H2  Montserrat Regular     36px / 38px (2.375rem)  / 1.5
+// H3  Merriweather Regular   30px / 32px (2rem)      / 1.73
+// H4  Merriweather Light     25px / 27px (1.688rem)  / 1.48
+// H5  Montserrat Bold        12px / 14px (0.875rem)  / 1.5  — UPPERCASE, letter-spacing 1px, color $accent-orange-dark
+// Body Open Sans Regular     14px / 16px (1rem)      / 1.86
+// Links: $brand-primary-blue, underline, font-weight 700
+
+// ----- Spacing (16px vertical base; multiples of 8px) ------------------------
+$base-vertical-margin: 16px; // Component internal gaps, related element spacing
+$base-margin-bottom:   24px; // (16 x 1.5) Standard margin below paragraphs/sections/components
+$space-tight:   8px  !default; // Icon-to-label, inline pairs (no confirmed var name — TODO)
+$space-block:   32px !default; // Between related content blocks
+$space-section: 48px !default; // Between major page sections
+$space-rhythm:  64px !default; // Section-level vertical rhythm; hero padding
+
+// ----- Elevation / Shadow ----------------------------------------------------
+$shadow-standard: 0 2px 24px 0 rgba(0,0,0,0.15); // Cards, modals, dropdowns — used consistently, not scaled
+$shadow-subtle:   0 2px 8px rgba(0,0,0,0.06);    // Nav bar, sticky elements, light lift
+
+// ----- Border Radius ---------------------------------------------------------
+$radius-none: 0;      // Cards — square corners are INTENTIONAL. Do not round cards.
+$radius-sm:   4px;    // Buttons, form inputs, badges, tooltips, modal containers
+$radius-md:   6px;    // Style-guide nav bar; larger decorative containers
+$radius-pill: 9999px; // Pill badges; circular avatars
+
+// ----- Motion (purposeful only; honor prefers-reduced-motion) ----------------
+$motion-fast:       100ms; // Micro-interactions: checkbox, radio, icon swap
+$motion-normal:     200ms; // Button states, link underlines, focus rings
+$motion-slow:       350ms; // Panel slide, accordion expand, card hover
+$motion-deliberate: 500ms; // Modal enter/exit, page-level transitions
+
+// ----- Grid & Breakpoints ----------------------------------------------------
+$bp-tablet:  768px;  // Tablet two-column layouts begin; hamburger nav below this
+$bp-desktop: 1100px; // Full multi-column grids at/above this
+$content-max-width: 1280px; // Max content width, centered (§7)
+$grid-gutter-desktop: 24px;
+$grid-gutter-tablet:  16px;
+
+// ----- Reduced motion — REQUIRED (§4.6, §12.1) -------------------------------
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:  0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

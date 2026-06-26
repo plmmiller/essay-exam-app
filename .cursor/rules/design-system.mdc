@@ -1,0 +1,24 @@
+---
+description: TI Design System v2.1 — visual and content standard for all UI, copy, slides, and email. Always apply.
+globs:
+  - "**/*.{ts,tsx,js,jsx,scss,css,html,md}"
+alwaysApply: true
+---
+
+# TI Design System v2.1 (TIKG/AB/CEU)
+
+Full machine-readable reference lives in `@design-system/` — load the relevant file before generating, then check output against `@design-system/qa-checklist.md`. **Context in → generate → checklist out.**
+
+## Non-negotiables
+
+- **Tokens only — never hardcoded hex/fonts/spacing/shadow/radius/motion.** Use `@design-system/tokens.scss` or `@design-system/tokens.css`. Literal colors require review.
+- **Three typefaces only:** Merriweather (H1/H3/H4), Montserrat (H2/H5, buttons, nav), Open Sans (body).
+- **Cards:** `border-radius: 0` + shadow `0 2px 24px 0 rgba(0,0,0,0.15)`.
+- **Buttons:** Montserrat Bold 14px uppercase, letter-spacing 1px, min-width 150px, radius 4px; all five states (default/hover/focus 2px outline/active/disabled 40%).
+- **Body text** = `#58595b` (never a brand color). **Purple = AI content only.**
+- **Breakpoints** 768px / 1100px; max content width 1280px.
+- **WCAG 2.1 AA mandatory:** 4.5:1 body / 3:1 large+UI; visible keyboard focus; semantic HTML; one H1; honor `prefers-reduced-motion`; `aria-label` on icon-only controls. Run axe/Lighthouse before accepting a component.
+- **Voice:** see `@design-system/voice-and-content.md` — sentence-case UI labels, designation trademark format (CPCU®, ARM™), descriptive links (no "click here").
+- **No AI-generated imagery** as TIKG visual assets.
+
+Component specs: `@design-system/components.md`. Platform rules (web/PPT/email/LMS/webinar): `@design-system/platform-guides.md`. Authoritative web source: `web-develop.theinstitutes.org/themes/ti_west/public/style-guide/` (wins for web specifics).
