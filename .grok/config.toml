@@ -1,0 +1,7 @@
+# .grok/config.toml — Grok Build project config
+# Instructions are NOT duplicated here. Grok Build reads CLAUDE.md / AGENTS.md
+# natively — the same sources Claude Code and Cursor use. This file only pins
+# the model so all three tools behave predictably per project.
+
+[models]
+default = "grok-build-0.1"
