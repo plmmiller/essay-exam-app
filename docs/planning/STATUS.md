@@ -5,10 +5,10 @@
 > **verified against the actual code/repo at the date shown — never assumed.**
 > When work lands, this file is updated in the same change.
 
-- **Last updated:** 2026-06-22
+- **Last updated:** 2026-07-05
 - **Updated by:** reconciled by agent (verified against code)
-- **Verified against:** `main @ 3f45889`
-- **Phase / milestone:** Feature-complete v1 (Streamlit MVP), deployment-ready
+- **Verified against:** `chore/ti-design-system @ 6eeaa75` (current branch; 3 commits ahead of `main @ 3f45889`: STATUS.md discipline in CLAUDE.md, TI Design System v2.1, personal-account migration checkpoint)
+- **Phase / milestone:** Feature-complete v1 (Streamlit MVP), deployment-ready; TI Design System v2.1 landed on branch
 - **Source plan(s):** `docs/PRD.docx` (binary, not parsed), `TEST_PLAN.md`, `USERS_MANUAL.md`, `Essay exams.docx`. No `F-NN` work-item list existed in the repo; IDs below are derived from the actual modules/features.
 
 ## At a glance
@@ -80,6 +80,7 @@
 
 ## Changelog
 
+- **2026-07-05** — Daily reconcile: header advanced to `chore/ti-design-system @ 6eeaa75`. Three commits added since 2026-06-22: STATUS.md discipline docs (42a6dec), TI Design System v2.1 (1850d88), checkpoint for pending personal-account migration (6eeaa75). Branch not yet merged to `main`. Application-code items F-01…F-18 unchanged.
 - **2026-06-22** — reconciled seed → verified statuses (✅ 14 / 🟡 3 / ⬜ 1 / 🚫 0). Derived F-01..F-18 from actual modules/features; cited `test_automated.py` cases and source functions as evidence. (F-19 "CI test runner" tracked as ⬜ in Next up — no in-repo evidence.)
 
 ---
