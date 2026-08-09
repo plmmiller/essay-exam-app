@@ -1,0 +1,18 @@
+---
+description: essay-exam-app project instructions. Always apply.
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# essay-exam-app — Project Overview (Cursor)
+
+**Claude Code, Cursor, and Grok/opencode must behave identically.**
+
+- Read `CLAUDE.md` and `AGENTS.md` at the project root.
+- Follow global rules from `~/.claude/CLAUDE.md`.
+- Keep `STATUS.md` (or equivalent planning doc) as the verified burndown.
+- Update planning docs in the same commit as code changes.
+- One feature → one branch → one PR.
+
+See root `CLAUDE.md` / `AGENTS.md` for full details.
